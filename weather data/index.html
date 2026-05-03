@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather Trend Visualization</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Loading weather data...</div>
+</div>
+<div class="noise-overlay"></div>
+<div class="particles-container" id="particlesContainer"></div>
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-brand" aria-label="Home">
+      <div class="nav-brand-icon"><i class="fas fa-cloud-sun"></i></div>
+      <span class="nav-brand-text">WeatherViz</span>
+    </a>
+    <div class="nav-controls">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light theme" title="Toggle theme">
+        <div class="theme-toggle-knob" id="themeKnob">
+          <i class="fas fa-moon" id="themeIcon"></i>
+        </div>
+      </button>
+    </div>
+  </div>
+</nav>
+<main>
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">
+        <i class="fas fa-location-dot"></i>
+        Karachi, Pakistan
+      </div>
+      <h1>Weather Trend<br><span class="highlight">Visualization</span></h1>
+      <p>Explore monthly temperature patterns for Karachi over the last 12 months. Track high and low temperatures through interactive charts and detailed data breakdowns.</p>
+    </div>
+  </section>
+  <section class="container">
+    <div class="stats-row" id="statsRow">
+      <!-- Populated by JS -->
+    </div>
+  </section>
+  <section class="container chart-section reveal">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title-group">
+          <h2>Monthly Temperature Trends</h2>
+          <p>High vs Low temperature over 12 months</p>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item">
+            <span class="legend-dot high"></span>High Temp
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot low"></span>Low Temp
+          </div>
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="weatherChart"></canvas>
+      </div>
+    </div>
+  </section>
+  <section class="container info-section reveal">
+    <div class="info-card">
+      <div class="info-card-header">
+        <div class="info-card-icon data"><i class="fas fa-database"></i></div>
+        <h3>About the Data</h3>
+      </div>
+      <p>This visualization processes historical weather records parsed from CSV format. Daily readings are aggregated into monthly averages, extracting the mean high and low temperatures for each month to reveal seasonal patterns.</p>
+    </div>
+    <div class="info-card">
+      <div class="info-card-header">
+        <div class="info-card-icon city"><i class="fas fa-city"></i></div>
+        <h3>About Karachi</h3>
+      </div>
+      <p>Karachi features a tropical arid climate with warm winters and extremely hot summers. Monthly temperatures range from mild 13°C lows in January to scorching 42°C highs in May and June, shaped by coastal and monsoonal influences.</p>
+    </div>
+  </section>
+  <section class="container table-section reveal">
+    <div class="table-card">
+      <div class="table-card-header">
+        <h2>Monthly Breakdown</h2>
+        <span id="tableDateRange">--</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data-table" id="dataTable">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>High Temp</th>
+              <th>Low Temp</th>
+              <th>Range</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>
+  <div class="container">
+    <p>Built with Chart.js &middot; Weather data for demonstration purposes</p>
+    <div class="footer-links">
+      <a href="#">WeatherViz</a>
+      <a href="#">Chart.js</a>
+      <a href="#">Karachi Climate</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const CSV_DATA = `Date,High Temperature,Low Temperature
+2024-01-01,26,13
+2024-01-05,27,14
+2024-01-10,28,13
+2024-01-15,25,12
+2024-01-20,26,11
+2024-01-25,27,13
+2024-01-30,28,14
+2024-02-03,29,15
+2024-02-08,30,16
+2024-02-13,31,17
+2024-02-18,32,18
+2024-02-23,33,18
+2024-02-28,33,19
+2024-03-04,34,20
+2024-03-09,36,21
+2024-03-14,37,22
+2024-03-19,38,23
+2024-03-24,39,24
+2024-03-29,39,25
+2024-04-03,40,26
+2024-04-08,41,27
+2024-04-13,42,28
+2024-04-18,42,29
+2024-04-23,41,28
+2024-04-28,40,27
+2024-05-03,41,29
+2024-05-08,42,30
+2024-05-13,42,31
+2024-05-18,40,30
+2024-05-23,39,29
+2024-05-28,38,29
+2024-06-02,37,28
+2024-06-07,36,28
+2024-06-12,35,27
+2024-06-17,34,27
+2024-06-22,33,26
+2024-06-27,33,27
+2024-07-02,32,27
+2024-07-07,31,26
+2024-07-12,30,26
+2024-07-17,31,27
+2024-07-22,32,27
+2024-07-27,31,26
+2024-08-01,30,26
+2024-08-06,29,25
+2024-08-11,30,26
+2024-08-16,30,25
+2024-08-21,29,25
+2024-08-26,30,26
+2024-08-31,31,26
+2024-09-05,32,26
+2024-09-10,33,26
+2024-09-15,33,25
+2024-09-20,34,25
+2024-09-25,34,24
+2024-09-30,33,24
+2024-10-05,35,23
+2024-10-10,36,23
+2024-10-15,36,22
+2024-10-20,35,21
+2024-10-25,34,20
+2024-10-30,33,19
+2024-11-04,33,18
+2024-11-09,32,17
+2024-11-14,31,16
+2024-11-19,30,16
+2024-11-24,29,15
+2024-11-29,29,15
+2024-12-04,28,14
+2024-12-09,27,13
+2024-12-14,27,12
+2024-12-19,26,12
+2024-12-24,26,11
+2024-12-29,25,11`;
+  function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim());
+      if (values.length === headers.length) {
+        const row = {};
+        headers.forEach((h, idx) => {
+          row[h] = idx > 0 ? parseFloat(values[idx]) : values[idx];
+        });
+        rows.push(row);
+      }
+    }
+    return rows;
+  }
+  function processWeatherData(rows) {
+    rows.forEach(r => {
+      r.dateObj = new Date(r.Date + 'T00:00:00');
+    });
+    rows.sort((a, b) => a.dateObj - b.dateObj);
+    const latestDate = new Date(rows[rows.length - 1].dateObj);
+    const twelveMonthsAgo = new Date(latestDate);
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+    twelveMonthsAgo.setDate(1);
+    const filtered = rows.filter(r => r.dateObj >= twelveMonthsAgo);
+    const groups = {};
+    filtered.forEach(r => {
+      const key = `${r.dateObj.getFullYear()}-${String(r.dateObj.getMonth() + 1).padStart(2, '0')}`;
+      if (!groups[key]) groups[key] = { highs: [], lows: [], dateObj: r.dateObj };
+      groups[key].highs.push(r['High Temperature']);
+      groups[key].lows.push(r['Low Temperature']);
+    });
+    const months = Object.keys(groups).sort();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fullMonthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const result = months.map(key => {
+      const g = groups[key];
+      const avgHigh = Math.round(g.highs.reduce((a, b) => a + b, 0) / g.highs.length * 10) / 10;
+      const avgLow = Math.round(g.lows.reduce((a, b) => a + b, 0) / g.lows.length * 10) / 10;
+      const m = g.dateObj.getMonth();
+      return {
+        key,
+        label: monthNames[m],
+        fullLabel: fullMonthNames[m],
+        year: g.dateObj.getFullYear(),
+        avgHigh,
+        avgLow,
+        diff: Math.round((avgHigh - avgLow) * 10) / 10
+      };
+    });
+
+    return result;
+  }
+  function renderStats(data) {
+    const maxHigh = Math.max(...data.map(d => d.avgHigh));
+    const minLow = Math.min(...data.map(d => d.avgLow));
+    const allTemps = data.flatMap(d => [d.avgHigh, d.avgLow]);
+    const overallAvg = Math.round(allTemps.reduce((a, b) => a + b, 0) / allTemps.length * 10) / 10;
+    const maxRange = Math.max(...data.map(d => d.diff));
+
+    const stats = [
+      { icon: 'fa-temperature-high', cls: 'high', value: `${maxHigh}°C`, label: 'Peak High' },
+      { icon: 'fa-temperature-low', cls: 'low', value: `${minLow}°C`, label: 'Lowest Low' },
+      { icon: 'fa-chart-line', cls: 'avg', value: `${overallAvg}°C`, label: 'Overall Avg' },
+      { icon: 'fa-arrows-up-down', cls: 'range', value: `${maxRange}°C`, label: 'Max Range' }
+    ];
+
+    const row = document.getElementById('statsRow');
+    row.innerHTML = stats.map(s => `
+      <div class="stat-card">
+        <div class="stat-icon ${s.cls}"><i class="fas ${s.icon}"></i></div>
+        <div class="stat-value">${s.value}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>
+    `).join('');
+  }
+  let weatherChart = null;
+
+  function createChart(data) {
+    const ctx = document.getElementById('weatherChart').getContext('2d');
+    const style = getComputedStyle(document.documentElement);
+    const lineHigh = style.getPropertyValue('--line-high').trim();
+    const lineLow = style.getPropertyValue('--line-low').trim();
+    const lineHighBg = style.getPropertyValue('--line-high-bg').trim();
+    const lineLowBg = style.getPropertyValue('--line-low-bg').trim();
+    const fg = style.getPropertyValue('--fg').trim();
+    const muted = style.getPropertyValue('--muted').trim();
+    const border = style.getPropertyValue('--border').trim();
+
+    const labels = data.map(d => d.label);
+    const highs = data.map(d => d.avgHigh);
+    const lows = data.map(d => d.avgLow);
+
+    if (weatherChart) {
+      weatherChart.destroy();
+    }
+
+    weatherChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'High Temperature (°C)',
+            data: highs,
+            borderColor: lineHigh,
+            backgroundColor: lineHighBg,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 8,
+            pointBackgroundColor: lineHigh,
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 3,
+            fill: true,
+            tension: 0.4
+          },
+          {
+            label: 'Low Temperature (°C)',
+            data: lows,
+            borderColor: lineLow,
+            backgroundColor: lineLowBg,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 8,
+            pointBackgroundColor: lineLow,
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 3,
+            fill: true,
+            tension: 0.4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15,17,24,0.92)',
+            titleColor: '#f0ece4',
+            bodyColor: '#a8a4b8',
+            borderColor: 'rgba(255,255,255,0.08)',
+            borderWidth: 1,
+            cornerRadius: 10,
+            padding: 14,
+            titleFont: { family: 'Space Grotesk', size: 14, weight: '600' },
+            bodyFont: { family: 'DM Sans', size: 13 },
+            displayColors: true,
+            boxPadding: 6,
+            callbacks: {
+              title: function(items) {
+                const idx = items[0].dataIndex;
+                return `${data[idx].fullLabel} ${data[idx].year}`;
+              },
+              label: function(context) {
+                return ` ${context.dataset.label}: ${context.parsed.y}°C`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              color: border,
+              drawBorder: false
+            },
+            ticks: {
+              color: muted,
+              font: { family: 'DM Sans', size: 12, weight: '500' },
+              padding: 8
+            },
+            border: { display: false }
+          },
+          y: {
+            min: Math.min(...lows) - 4,
+            max: Math.max(...highs) + 4,
+            grid: {
+              color: border,
+              drawBorder: false
+            },
+            ticks: {
+              color: muted,
+              font: { family: 'Space Grotesk', size: 12 },
+              padding: 12,
+              callback: function(val) { return val + '°'; },
+              stepSize: 5
+            },
+            border: { display: false }
+          }
+        },
+        animation: {
+          duration: 1200,
+          easing: 'easeOutQuart'
+        }
+      }
+    });
+  }
+  function renderTable(data) {
+    const tbody = document.getElementById('tableBody');
+    const maxHigh = Math.max(...data.map(d => d.avgHigh));
+
+    // Set date range text
+    const first = data[0];
+    const last = data[data.length - 1];
+    document.getElementById('tableDateRange').textContent =
+      `${first.fullLabel} ${first.year} — ${last.fullLabel} ${last.year}`;
+
+    tbody.innerHTML = data.map(d => {
+      const barWidth = Math.max(10, (d.avgHigh / maxHigh) * 100);
+      return `
+        <tr>
+          <td class="month-name">${d.fullLabel} ${d.year}</td>
+          <td class="temp-high">${d.avgHigh}°C</td>
+          <td class="temp-low">${d.avgLow}°C</td>
+          <td class="temp-bar-cell">
+            <div class="temp-bar-wrapper">
+              <div class="temp-bar-track">
+                <div class="temp-bar-fill" style="width: ${barWidth}%"></div>
+              </div>
+              <span class="temp-diff">${d.diff}°</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Animate bars in with a slight delay
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.temp-bar-fill').forEach(bar => {
+        const w = bar.style.width;
+        bar.style.width = '0%';
+        requestAnimationFrame(() => { bar.style.width = w; });
+      });
+    });
+  }
+  function initTheme() {
+    const saved = localStorage.getItem('weatherVizTheme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+    updateThemeIcon();
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('weatherVizTheme', next);
+    updateThemeIcon();
+    if (processedData) {
+      setTimeout(() => createChart(processedData), 50);
+    }
+  }
+
+  function updateThemeIcon() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const icon = document.getElementById('themeIcon');
+    icon.className = isDark ? 'fas fa-moon' : 'fas fa-sun';
+  }
+
+  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+  function createParticles() {
+    const container = document.getElementById('particlesContainer');
+    const count = 18;
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const size = Math.random() * 3 + 1.5;
+      const left = Math.random() * 100;
+      const duration = Math.random() * 18 + 14;
+      const delay = Math.random() * 20;
+      const isWarm = Math.random() > 0.5;
+      p.style.cssText = `
+        width: ${size}px; height: ${size}px;
+        left: ${left}%;
+        background: ${isWarm ? 'var(--accent)' : 'var(--line-low)'};
+        animation-duration: ${duration}s;
+        animation-delay: ${delay}s;
+        filter: blur(${size > 2.5 ? 1 : 0}px);
+      `;
+      container.appendChild(p);
+    }
+  }
+  function initScrollReveal() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  }
+  let processedData = null;
+
+  function init() {
+    initTheme();
+    createParticles();
+    setTimeout(() => {
+      const rows = parseCSV(CSV_DATA);
+      processedData = processWeatherData(rows);
+      renderStats(processedData);
+      createChart(processedData);
+      renderTable(processedData);
+      initScrollReveal();
+      document.getElementById('loadingOverlay').classList.add('hidden');
+    }, 800);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 't' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+      toggleTheme();
+    }
+  });
+  init();
+</script>
+</body>
+</html>
